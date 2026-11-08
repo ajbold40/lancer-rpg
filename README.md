@@ -27,7 +27,7 @@ npm run dev
 
 ## Art and assets
 
-- Frame artwork belongs to Massif Press. The `image_url` field in the data is not rendered unless Massif grants permission.
+- Frame artwork belongs to Massif Press and is **off by default**. Once Massif grants permission, set `VITE_SHOW_FRAME_ART=true` in Vercel's environment variables and redeploy. The build then downloads the art into `public/frames/` (git-ignored), so it is served by the site but never committed to this public repo.
 - Unit sprites are placeholders until sprite permissions are confirmed.
 
 ## License

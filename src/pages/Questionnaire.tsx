@@ -4,6 +4,7 @@ import { frames } from '../config/campaign'
 import { questions } from '../questionnaire/questions'
 import { pickResults, rankFrames, reasons, sumWeights, type Match } from '../questionnaire/scoring'
 import { catches } from '../questionnaire/catches'
+import FrameArt from '../components/FrameArt'
 
 type Answers = (number | undefined)[]
 
@@ -150,6 +151,7 @@ function ResultCard({ match, rank }: { match: Match; rank?: number }) {
   const s = f.stats
   return (
     <article className="result">
+      <FrameArt frame={f} />
       <header>
         {rank && <span className="rank">#{rank}</span>}
         <h3>{f.name}</h3>

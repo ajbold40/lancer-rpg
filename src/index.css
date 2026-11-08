@@ -5,6 +5,8 @@
   --text: #e6e9ed;
   --muted: #9aa4b0;
   --accent: #e8a33d;
+  --highlight: #a3e635;
+  --highlight-tint: rgba(163, 230, 53, 0.08);
   color-scheme: dark;
   font-family: 'Inter', system-ui, sans-serif;
   color: var(--text);
@@ -23,7 +25,9 @@ a { color: inherit; text-decoration: none; }
 .brand { font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
 .topbar nav { display: flex; gap: 16px; }
 .topbar nav a { color: var(--muted); }
-.topbar nav a.active { color: var(--text); }
+.topbar nav a { padding-bottom: 2px; border-bottom: 2px solid transparent; }
+.topbar nav a:hover { color: var(--highlight); }
+.topbar nav a.active { color: var(--text); border-bottom-color: var(--highlight); }
 
 main { flex: 1; }
 .page { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
@@ -31,13 +35,14 @@ main { flex: 1; }
 
 .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-top: 24px; }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
-.card:hover { border-color: var(--accent); }
+.card:hover { border-color: var(--highlight); background: var(--highlight-tint); }
 .card h2 { margin: 0 0 6px; font-size: 1.1rem; }
 .card p { margin: 0; color: var(--muted); }
 
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
 .chip { background: var(--panel); color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; cursor: pointer; }
-.chip.on { color: var(--bg); background: var(--accent); border-color: var(--accent); }
+.chip:hover { color: var(--highlight); border-color: var(--highlight); }
+.chip.on { color: var(--bg); background: var(--highlight); border-color: var(--highlight); }
 
 .table-wrap { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
@@ -50,6 +55,8 @@ td:nth-child(n+5), th:nth-child(n+5) { text-align: right; font-variant-numeric: 
 
 .page.narrow { max-width: 680px; }
 button.primary { background: var(--accent); color: var(--bg); border: 0; border-radius: 6px; padding: 10px 20px; font-weight: 700; cursor: pointer; margin-top: 16px; }
+button.primary:hover { background: var(--highlight); }
+button.link:hover { color: var(--highlight); }
 button.link { background: none; border: 0; color: var(--muted); cursor: pointer; padding: 8px 0; margin-top: 12px; }
 .eyebrow { color: var(--muted); font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase; margin: 16px 0 4px; }
 .prompt { margin: 0 0 16px; font-size: 1.5rem; }
@@ -57,7 +64,7 @@ button.link { background: none; border: 0; color: var(--muted); cursor: pointer;
 .progress > div { height: 100%; background: var(--accent); transition: width 0.2s; }
 .options { display: grid; gap: 10px; }
 .option { text-align: left; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; font-size: 1rem; cursor: pointer; }
-.option:hover, .option.on { border-color: var(--accent); }
+.option:hover, .option.on { border-color: var(--highlight); background: var(--highlight-tint); }
 
 .results { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin: 16px 0; }
 .result { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
@@ -82,3 +89,9 @@ button.link { background: none; border: 0; color: var(--muted); cursor: pointer;
 .union { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; margin-top: 24px; }
 .union p { margin: 6px 0; }
 .union .section-title { margin-top: 0; }
+
+:focus-visible { outline: 2px solid var(--highlight); outline-offset: 2px; }
+tbody tr:hover td { background: var(--highlight-tint); }
+
+.frame-art { margin: -16px -16px 12px; border-radius: 8px 8px 0 0; background: var(--bg); aspect-ratio: 4 / 3; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.frame-art img { max-width: 100%; max-height: 100%; object-fit: contain; }
