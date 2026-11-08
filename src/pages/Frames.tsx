@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { frames, manufacturers, type FrameRole } from '../data/lancer'
+import { books, manufacturers, type FrameRole } from '../data/lancer'
+import { frames } from '../config/campaign'
 
 const roles: (FrameRole | 'All')[] = [
   'All',
@@ -25,6 +26,7 @@ export default function Frames() {
   return (
     <section className="page">
       <h1>Frames</h1>
+      <p className="lede">{shown.length} frames</p>
       <div className="chips">
         {roles.map((r) => (
           <button key={r} className={r === role ? 'chip on' : 'chip'} onClick={() => setRole(r)}>
@@ -39,6 +41,7 @@ export default function Frames() {
               <th>Frame</th>
               <th>Maker</th>
               <th>Role</th>
+              <th>Book</th>
               <th>Size</th>
               <th>HP</th>
               <th>Armor</th>
@@ -55,6 +58,7 @@ export default function Frames() {
                 <td>{f.name}</td>
                 <td title={manufacturers[f.source]}>{f.source}</td>
                 <td>{f.mechtype.join(', ')}</td>
+                <td>{books[f.book]}</td>
                 <td>{f.stats.size}</td>
                 <td>{f.stats.hp}</td>
                 <td>{f.stats.armor}</td>

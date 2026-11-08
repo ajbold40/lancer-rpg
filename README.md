@@ -7,7 +7,7 @@ Campaign tools for running a Lancer game: a frame-picker questionnaire for playe
 - Vite + React + TypeScript
 - Supabase (auth, storage, realtime turn sync)
 - Vercel for hosting
-- Core game data from [`@massif/lancer-data`](https://github.com/massif-press/lancer-data)
+- Core and supplement game data from Massif's `@massif/*-data` packages (GPL-3.0-or-later). Turn books on or off in `src/config/campaign.ts`.
 
 ## Getting started
 
@@ -20,7 +20,7 @@ npm run dev
 ## Roadmap
 
 1. ~~Repo scaffold~~
-2. Frame questionnaire: playstyle questions scored against frame roles and stats
+2. ~~Frame questionnaire v1~~: 11 questions, 55 frames (core + 8 supplements), manufacturer "catch" blurbs. SSC, IPS-N and GMS blurbs still need checking against the books.
 3. Hex grid design doc: data model, rendering, realtime sync, MVP scope
 4. Hex grid MVP: place units, move by Speed, turn order, HP/heat/structure tracking
 5. Campaign layer: faction rosters, NPCs, COMP/CON pilot import
