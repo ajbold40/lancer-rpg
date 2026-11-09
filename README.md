@@ -21,7 +21,7 @@ npm run dev
 
 1. ~~Repo scaffold~~
 2. ~~Frame questionnaire v1~~: 11 questions, 55 frames (core + 8 supplements), manufacturer "catch" blurbs. SSC, IPS-N and GMS blurbs still need checking against the books.
-3. Hex grid design doc: data model, rendering, realtime sync, MVP scope
+3. Hex grid design doc: see [`docs/grid-design.md`](docs/grid-design.md) (draft)
 4. Hex grid MVP: place units, move by Speed, turn order, HP/heat/structure tracking
 5. Campaign layer: faction rosters, NPCs, COMP/CON pilot import
 
