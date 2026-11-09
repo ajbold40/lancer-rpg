@@ -26,7 +26,7 @@ npm run dev
    - ~~Milestone 1: local isometric board~~ (terrain, units, move range, engagement, rotation, undo)
    - Milestone 2: Supabase, Discord login, realtime sync, turn tracker, GM proxy
    - Milestone 3: HP/heat/structure tracking, combat log
-5. COMP/CON pilot import
+5. COMP/CON pilot import and a pilot roster page
 6. Campaign layer: faction rosters, encounter builder, story NPC tracker. See [`docs/campaign-design.md`](docs/campaign-design.md) (draft)
 
 ## Open questions

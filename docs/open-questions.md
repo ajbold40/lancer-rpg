@@ -24,6 +24,6 @@ One list for everything waiting on someone. Tick items off as they're settled, a
 
 ## Setup and admin
 
-- [ ] Point a domain at the site (e.g. `lancer.boldenink.com`) once the boldenink.com account is found.
+- [ ] Point `lancer.boldenink.com` (or another subdomain) at the site. boldenink.com is confirmed, managed in Squarespace.
 - [ ] Pick the app's real name to replace "Lancer Table".
 - [ ] Supabase project and Discord application for Milestone 2.

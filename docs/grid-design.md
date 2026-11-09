@@ -122,6 +122,14 @@ COMP/CON stays the source of truth for **builds** (pilot, frame, loadout, talent
 2. **Share code (to investigate).** COMP/CON accounts can generate a 6-character share code (valid 90 days), and Foundry's Lancer system imports by code. Resolving a code means calling COMP/CON's cloud backend, which has no published API. Ask in the LANCER Discord (#comp-con or #lancer-vtt) before building against it.
 3. **Re-sync between sessions.** After a level-up, re-import and the unit's max stats and loadout update. Combat state is untouched.
 
+### Pilot roster page
+
+COMP/CON has no public link to a pilot, so the site keeps its own copies:
+
+- Each player uploads their pilot export once. The roster shows a card per pilot with callsign, frame, loadout and License Level, and players re-upload after a level-up. This is the same import the board uses.
+- A card can also hold the player's COMP/CON **share code**, so teammates can pull the full sheet into their own COMP/CON.
+- If share-code lookups are approved later, the roster could refresh itself from the code instead of needing re-uploads.
+
 ## Milestones
 
 1. **Board, local only.** ✅ Done: isometric map, terrain painting, unit placement by frame, move range with Boost, engagement flags, rotation, undo. Saved in the browser.
