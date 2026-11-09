@@ -131,8 +131,4 @@ COMP/CON stays the source of truth for **builds** (pilot, frame, loadout, talent
 
 ## Open questions
 
-- Hex footprint for Size 2 and 3 (see above).
-- Do maps need a background image in v1, or is painted terrain enough?
-- Can we resolve COMP/CON share codes? Ask the COMP/CON devs.
-- How should cover and line of sight be shown before they're automated: GM-placed markers, or terrain flags only?
-- Which automation does the table want first? A quick poll after a session or two will answer this.
+Tracked in [`open-questions.md`](open-questions.md), along with book checks and permissions.

@@ -28,6 +28,10 @@ npm run dev
    - Milestone 3: HP/heat/structure tracking, combat log
 5. Campaign layer: faction rosters, NPCs, COMP/CON pilot import
 
+## Open questions
+
+Everything waiting on a book check, a permission or a decision is in [`docs/open-questions.md`](docs/open-questions.md).
+
 ## Art and assets
 
 - Frame artwork belongs to Massif Press and is **off by default**. Once Massif grants permission, set `VITE_SHOW_FRAME_ART=true` in Vercel's environment variables and redeploy. The build then downloads the art into `public/frames/` (git-ignored), so it is served by the site but never committed to this public repo.
