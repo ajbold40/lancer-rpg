@@ -114,6 +114,8 @@ When players are in the same room, they shouldn't all need to log in. The GM can
 
 ## Importing from COMP/CON
 
+Reference: [COMP/CON FAQ: Sharing Pilots](https://github.com/massif-press/compcon/wiki/Frequently-Asked-Questions#sharing-pilots).
+
 COMP/CON stays the source of truth for **builds** (pilot, frame, loadout, talents). This app owns **combat state** (position, HP, heat, statuses). Import flows one way, from COMP/CON into the unit.
 
 1. **File import (planned).** COMP/CON's "Export Pilot" downloads a pilot `.json` with no account needed. The player uploads it and picks which mech to bring. That fills in frame, Size, Speed and max stats. The format is COMP/CON's own and documented by the lancer-data spec.
