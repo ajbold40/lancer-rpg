@@ -9,6 +9,8 @@ One list for everything waiting on someone. Tick items off as they're settled, a
 - [ ] **Engagement and movement.** The board flags hexes where you'd become engaged but doesn't stop you there. Check when engagement ends a move (e.g. Size comparisons) before that becomes automation.
 - [ ] **Manufacturer "catch" blurbs for SSC and IPS-N**, plus the GMS/Union line. They're marked as drafts on the results page. Edit in `src/questionnaire/catches.ts` and set `verified: true`.
 
+- [ ] **Where the core NPC classes come from.** They're not in Massif's open data packages. Check which COMP/CON content files (`.lcp`) that come with the books include NPC classes, features and templates.
+
 ## Permissions to ask for
 
 - [ ] **Retrograde Minis:** using their sprites in the online grid. (AJ is emailing them.)
