@@ -74,7 +74,8 @@ events        id, encounter_id, seq, actor_user_id, on_behalf_of_user_id, type, 
 
 ## Coordinates and rendering
 
-- **Axial hex coordinates** `(q, r)`, using `honeycomb-grid` for the math (neighbors, distance, rings, pathfinding).
+- **Axial hex coordinates** `(q, r)`, flat-top. The math is hand-rolled in `src/table/hex.ts` (about 100 lines, unit-tested) instead of pulling in a library.
+- **Isometric (2.5D) view** to suit front-facing standee sprites: hexes are squashed vertically, blocking terrain and cover are drawn as raised blocks, and units are upright standees drawn back to front. The view rotates in 60° steps so nothing stays hidden behind tall terrain.
 - **SVG** to start. It's easy to style, theme and click, and fine for the few hundred hexes a Lancer map uses. Switch to PixiJS only if performance demands it.
 - Pan and zoom; mobile works but desktop is the primary target.
 - Tokens are placeholder hexes with the frame name and side color until sprite permission comes through. Then they take sprites keyed by frame or unit.
@@ -88,6 +89,7 @@ Lancer units are Size ½, 1, 2 or 3. We need to decide how many hexes Size 2 and
 - Click your unit to show reachable hexes up to its Speed, with difficult terrain costing double and blocking terrain impassable.
 - Boost shows a second, lighter ring.
 - Moving out of engagement and into new engagement is flagged, not blocked.
+- Cover is passable for now (GM's call). If hard cover should block movement, it's a one-line change in `src/table/movement.ts`.
 - The GM can drag anything anywhere.
 
 ## Auth and identity
@@ -120,7 +122,7 @@ COMP/CON stays the source of truth for **builds** (pilot, frame, loadout, talent
 
 ## Milestones
 
-1. **Board, local only.** Render a map, paint terrain, place tokens, show move range. No backend. Proves out the hex math and the UI.
+1. **Board, local only.** ✅ Done: isometric map, terrain painting, unit placement by frame, move range with Boost, engagement flags, rotation, undo. Saved in the browser.
 2. **Shared table.** Supabase project, Discord login, campaigns, the events table, realtime sync, turn tracker, players moving their own units, GM proxy.
 3. **Tracking.** HP, heat, structure, stress, statuses, combat log, GM undo.
 4. **Async.** Discord turn notifications, turn timer.
