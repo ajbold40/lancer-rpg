@@ -65,7 +65,7 @@ maps          id, campaign_id, name, radius or width/height, background_url
 terrain       map_id, q, r, kind (blocking | difficult | cover_soft | cover_hard | ...)
 units         id, encounter_id, side (pc | npc), owner_user_id, name, frame_id,
               size, speed, + max stats snapshot (hp, heatcap, structure, stress, evasion, edef...)
-events        id, encounter_id, seq, actor_user_id, type, payload (jsonb), created_at
+events        id, encounter_id, seq, actor_user_id, on_behalf_of_user_id, type, payload (jsonb), created_at
 ```
 
 - Unit **current** values (position, HP, heat, statuses) come from replaying events, cached in a `unit_state` view or table for fast loads.
@@ -92,8 +92,18 @@ Lancer units are Size ½, 1, 2 or 3. We need to decide how many hexes Size 2 and
 
 ## Auth and identity
 
-- Supabase Auth with **Discord login** (likely where the group already is) or email magic links.
-- A player joins a campaign by invite link, then claims their unit. GM is whoever created the campaign.
+- **Discord login** through Supabase Auth.
+- A player joins a campaign by invite link, then claims their unit. The GM is whoever created the campaign.
+- Units don't have to be claimed. An unclaimed PC unit is controlled by the GM.
+
+### GM proxy (couch play)
+
+When players are in the same room, they shouldn't all need to log in. The GM can **act as any player**:
+
+- A "Playing as" switcher in the GM's view picks which player's unit the GM is driving. The turn rules then apply as if that player were acting.
+- Events record both the person who did it and who it was for: `actor_user_id` (the GM) and `on_behalf_of` (the player, or null). The combat log shows "Goblin moved (via GM)".
+- A player can log in mid-session and take over their unit without anything else changing.
+- Mixed tables work: two players at the GM's house on the GM's screen, one remote player on their own device.
 
 ## Async play
 
@@ -102,21 +112,25 @@ Lancer units are Size ½, 1, 2 or 3. We need to decide how many hexes Size 2 and
 
 ## Importing from COMP/CON
 
-COMP/CON exports pilots and mechs as JSON. Importing a mech fills in the unit's frame, Size, Speed and max stats, so nobody retypes them. This is v1.5: until then, the GM picks a frame from the data and the app uses its base stats.
+COMP/CON stays the source of truth for **builds** (pilot, frame, loadout, talents). This app owns **combat state** (position, HP, heat, statuses). Import flows one way, from COMP/CON into the unit.
+
+1. **File import (planned).** COMP/CON's "Export Pilot" downloads a pilot `.json` with no account needed. The player uploads it and picks which mech to bring. That fills in frame, Size, Speed and max stats. The format is COMP/CON's own and documented by the lancer-data spec.
+2. **Share code (to investigate).** COMP/CON accounts can generate a 6-character share code (valid 90 days), and Foundry's Lancer system imports by code. Resolving a code means calling COMP/CON's cloud backend, which has no published API. Ask in the LANCER Discord (#comp-con or #lancer-vtt) before building against it.
+3. **Re-sync between sessions.** After a level-up, re-import and the unit's max stats and loadout update. Combat state is untouched.
 
 ## Milestones
 
 1. **Board, local only.** Render a map, paint terrain, place tokens, show move range. No backend. Proves out the hex math and the UI.
-2. **Shared table.** Supabase project, auth, campaigns, the events table, realtime sync, turn tracker, players moving their own units.
+2. **Shared table.** Supabase project, Discord login, campaigns, the events table, realtime sync, turn tracker, players moving their own units, GM proxy.
 3. **Tracking.** HP, heat, structure, stress, statuses, combat log, GM undo.
 4. **Async.** Discord turn notifications, turn timer.
-5. **COMP/CON import.**
+5. **COMP/CON import:** pilot file first, share codes if the devs are OK with it.
 6. **Automation modules**, one at a time, starting with whichever bookkeeping the table most wants handed off.
 
 ## Open questions
 
 - Hex footprint for Size 2 and 3 (see above).
 - Do maps need a background image in v1, or is painted terrain enough?
-- Discord login, or email magic links?
+- Can we resolve COMP/CON share codes? Ask the COMP/CON devs.
 - How should cover and line of sight be shown before they're automated: GM-placed markers, or terrain flags only?
 - Which automation does the table want first? A quick poll after a session or two will answer this.
