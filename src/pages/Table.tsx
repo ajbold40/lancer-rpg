@@ -169,7 +169,7 @@ export default function Table() {
                 Name (optional)
                 <input value={placeName} onChange={(e) => setPlaceName(e.target.value)} placeholder="Callsign" />
               </label>
-              <p className="hint">Click an open hex to place. Size 2 and 3 take 3 and 7 hexes (draft rule).</p>
+              <p className="hint">Click an open hex to place. Size 2 and 3 take 3 and 7 hexes.</p>
             </>
           )}
 
@@ -186,8 +186,8 @@ export default function Table() {
                   Boost (show double move)
                 </label>
                 <p className="hint">
-                  Click a highlighted hex to move. Amber rings mean you'd end up engaged. Shift-click any open hex to
-                  move freely (GM).
+                  Click a highlighted hex to move. Amber rings mean you'd end up engaged; engaging an enemy your Size
+                  or bigger ends your move. Shift-click any open hex to move freely (GM).
                 </p>
                 <button
                   className="danger"

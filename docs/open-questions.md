@@ -4,11 +4,13 @@ One list for everything waiting on someone. Tick items off as they're settled, a
 
 ## Check in the books
 
-- [ ] **Size 2 and 3 footprints on a hex grid.** The draft rule is 3 hexes for Size 2 and 7 for Size 3. Change in `footprint()` in `src/table/hex.ts`.
-- [ ] **Does hard cover block movement?** Right now cover is passable and only blocking terrain stops movement. Change in `src/table/movement.ts`.
-- [ ] **Engagement and movement.** The board flags hexes where you'd become engaged but doesn't stop you there. Check when engagement ends a move (e.g. Size comparisons) before that becomes automation.
-- [ ] **Manufacturer "catch" blurbs for SSC and IPS-N**, plus the GMS/Union line. They're marked as drafts on the results page. Edit in `src/questionnaire/catches.ts` and set `verified: true`.
-- [ ] **Where the core NPC classes come from.** They're not in Massif's open data packages. Check which COMP/CON content files (`.lcp`) that come with the books include NPC classes, features and templates.
+- [x] **Size 2 and 3 footprints on a hex grid.** Core book p59: SIZE N occupies N spaces on all sides; under SIZE 1 rounds up to 1 hex. So 3 hexes (2 across) for Size 2 and 7 (3 across) for Size 3, as drafted.
+- [x] **Does hard cover block movement?** Core book p62: obstruction is by SIZE. Solid objects and characters the same SIZE or larger block; smaller ones can be passed through, and nobody ends a move in an occupied space. The board now treats hard cover as a Size 1 object (`HARD_COVER_SIZE` in `src/table/movement.ts`). Soft cover doesn't block.
+- [x] **Engagement and movement.** Core book p62: becoming ENGAGED by a hostile of equal or greater SIZE ends the move immediately; already being engaged doesn't stop further movement. Hostiles also obstruct only if they're the same SIZE or larger. All now applied in move range.
+- [ ] **Manufacturer "catch" blurbs for SSC and IPS-N**, plus the GMS/Union line. Sources: core book p117–158 (manufacturer intros) and p392–404 (People: Galactic Powers). Claude can't read past p101 from Drive, see note below. They're marked as drafts on the results page. Edit in `src/questionnaire/catches.ts` and set `verified: true`.
+- [ ] **Where the core NPC classes come from.** They're in the core book (classes p284–321, templates p326–333) but not in Massif's open data packages. Check which COMP/CON content file (`.lcp`) that came with the book purchase includes them.
+
+**Reading the books:** Google Drive only returns text for the first 101 pages of a PDF, and won't hand over files above 10 MB. Later pages need the PDF attached to the chat directly, or split into smaller parts.
 
 ## Permissions to ask for
 

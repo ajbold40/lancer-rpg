@@ -7,7 +7,7 @@ const unit = (id: string, q: number, r: number, side: 'pc' | 'npc' = 'pc', size 
   id, q, r, side, size, speed, name: id, frameId: 'mf_test', frameName: 'Test',
 })
 
-const board = (units: Unit[], terrain: [number, number, 'blocking' | 'difficult'][] = []): BoardState => {
+const board = (units: Unit[], terrain: [number, number, 'blocking' | 'difficult' | 'cover_hard'][] = []): BoardState => {
   let s = emptyBoard()
   s = apply(s, { type: 'set_terrain', cells: terrain.map(([q, r, kind]) => ({ q, r, kind })) })
   for (const u of units) s = apply(s, { type: 'place_unit', unit: u })
@@ -48,14 +48,45 @@ describe('movement', () => {
     const r = reachable(board([unit('a', 0, 0)], [[1, 0, 'blocking']]), 'a', 4)
     expect(r.cost.has('1,0')).toBe(false)
   })
-  it('moves through allies but not hostiles, and never stops on anyone', () => {
-    // Wall of blocking terrain except one gap at (1,0)
-    const wall = [-1, 0, 1, 2].flatMap((r) => (r === 0 ? [] : [[1, r, 'blocking'] as [number, number, 'blocking']]))
+  // Wall of blocking terrain along q=1 except one gap at (1,0)
+  const wall = [-3, -2, -1, 1, 2, 3].map((r) => [1, r, 'blocking'] as [number, number, 'blocking'])
+  it('moves through allies but never stops on them', () => {
     const withAlly = reachable(board([unit('a', 0, 0), unit('b', 1, 0)], wall), 'a', 3)
     expect(withAlly.cost.has('2,0')).toBe(true)
     expect(withAlly.cost.has('1,0')).toBe(false)
-    const withFoe = reachable(board([unit('a', 0, 0), unit('x', 1, 0, 'npc')], wall), 'a', 2)
-    expect(withFoe.cost.has('2,0')).toBe(false)
+  })
+  it('is blocked by hostiles of equal or greater Size', () => {
+    const r = reachable(board([unit('a', 0, 0), unit('x', 1, 0, 'npc')], wall), 'a', 3)
+    expect(r.cost.has('2,0')).toBe(false)
+  })
+  it('can pass through smaller hostiles but not stop on them', () => {
+    const s = board([unit('big', 0, 0, 'pc', 2, 4), unit('pilot', 2, -1, 'npc', 0.5)])
+    const r = reachable(s, 'big', 4)
+    expect(r.cost.has('2,-1')).toBe(false) // can't end on the pilot
+    expect(r.cost.has('3,-1')).toBe(true) // but can get past it
+  })
+  it('stops when it becomes engaged by an equal or larger hostile', () => {
+    const r = reachable(board([unit('a', 0, 0), unit('x', 3, 0, 'npc')]), 'a', 4)
+    expect(r.cost.has('2,0')).toBe(true) // engaging hex is reachable...
+    expect(r.cost.has('2,1')).toBe(true)
+    expect(r.cost.has('3,1')).toBe(false) // ...but you can't walk along the enemy's side
+  })
+  it('is not stopped by a smaller hostile', () => {
+    const r = reachable(board([unit('big', 0, 0, 'pc', 2, 5), unit('x', 3, 0, 'npc', 1)]), 'big', 5)
+    expect(r.cost.has('5,-1')).toBe(true) // past the Size 1 hostile; a Size 2 hostile would stop it
+  })
+  it('keeps moving if it started engaged with that hostile', () => {
+    const r = reachable(board([unit('a', 0, 0), unit('x', 1, 0, 'npc')]), 'a', 3)
+    expect(r.cost.has('1,1')).toBe(true)
+    expect(r.cost.has('2,1')).toBe(true)
+  })
+  it('treats hard cover as a Size 1 object', () => {
+    const cover: [number, number, 'cover_hard'][] = [[1, 0, 'cover_hard']]
+    const small = reachable(board([unit('a', 0, 0)], cover), 'a', 4)
+    expect(small.cost.has('1,0')).toBe(false)
+    const big = reachable(board([unit('big', -1, 0, 'pc', 3, 4)], cover), 'big', 4)
+    // a Size 3 can step over it, but never end on it
+    expect([...big.cost.keys()].some((k) => k.startsWith('2,'))).toBe(true)
   })
   it('flags hexes next to hostiles as engaging', () => {
     const s = board([unit('a', 0, 0), unit('x', 3, 0, 'npc')])

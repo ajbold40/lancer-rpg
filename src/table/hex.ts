@@ -55,8 +55,9 @@ export function rotate(h: Hex, steps: number): Hex {
 
 /**
  * Hexes a unit occupies, anchored at `anchor`.
- * Draft convention until checked against the core book:
- * Size 1/2 and 1 → 1 hex, Size 2 → 3-hex triangle, Size 3 → 7-hex flower.
+ * Core rules: a SIZE N character occupies N spaces on all sides, and anything smaller than SIZE 1
+ * rounds up. On hexes: Size 1/2 and 1 → 1 hex, Size 2 → 3-hex triangle (2 across),
+ * Size 3 → 7-hex flower (3 across). Size 4+ isn't used by any player frame yet.
  */
 export function footprint(anchor: Hex, size: number): Hex[] {
   if (size <= 1) return [anchor]

@@ -82,14 +82,14 @@ events        id, encounter_id, seq, actor_user_id, on_behalf_of_user_id, type, 
 
 ### Size on a hex grid
 
-Lancer units are Size ½, 1, 2 or 3. We need to decide how many hexes Size 2 and 3 occupy. A common hex convention is 1 hex for Size ½–1, a 3-hex cluster for Size 2, and a 7-hex flower for Size 3. **Check against the core book before building.**
+Lancer units are Size ½, 1, 2 or 3. We need to decide how many hexes Size 2 and 3 occupy. Core p59: SIZE N occupies N spaces on all sides. On hexes that's 1 hex for Size ½–1, a 3-hex triangle for Size 2, and a 7-hex flower for Size 3.
 
 ## Movement (assist)
 
 - Click your unit to show reachable hexes up to its Speed, with difficult terrain costing double and blocking terrain impassable.
 - Boost shows a second, lighter ring.
 - Moving out of engagement and into new engagement is flagged, not blocked.
-- Cover is passable for now (GM's call). If hard cover should block movement, it's a one-line change in `src/table/movement.ts`.
+- Obstruction is by Size (core p62): hostiles and hard cover (treated as Size 1) block units their Size or smaller; bigger units pass through but can't stop there. Becoming engaged by an equal or larger hostile ends the move.
 - The GM can drag anything anywhere.
 
 ## Auth and identity
