@@ -120,7 +120,7 @@ export const questions: Question[] = [
     options: [
       { label: "Working for an empire that annexes worlds, as long as I'm the best-armed person there", weights: { HA: 2 } },
       { label: "Gear from people I'll never meet, with instructions that don't add up", weights: { HORUS: 2 } },
-      { label: 'Paying a premium to an exclusive club that decides who is worthy', weights: { SSC: 2 } },
+      { label: 'Lending my bloodline to a luxury brand that breeds people for the stars', weights: { SSC: 2 } },
       { label: 'Making a megacorp richer, because the cargo has to move', weights: { 'IPS-N': 2 } },
       { label: "None of it. I'll stick with Union-issue.", weights: { GMS: 3, Balanced: 1 } },
     ],
