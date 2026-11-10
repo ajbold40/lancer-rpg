@@ -84,12 +84,24 @@ events        id, encounter_id, seq, actor_user_id, on_behalf_of_user_id, type, 
 
 Lancer units are Size ½, 1, 2 or 3. We need to decide how many hexes Size 2 and 3 occupy. Core p59: SIZE N occupies N spaces on all sides. On hexes that's 1 hex for Size ½–1, a 3-hex triangle for Size 2, and a 7-hex flower for Size 3.
 
+## Maps and terrain
+
+Modelled on published Lancer battle maps (pointy-top hex grids over art, buildings and crates marked with a Height, plus zones).
+
+- **Map settings** (shape, orientation, background, display) are separate from the event log. They're set up once per map and will live in the `maps` table; calibration nudges shouldn't flood undo.
+- **Cells:** each hex has a height (0 = open ground) and any mix of tags: difficult, dangerous, soft cover, ramp, impassable.
+- **Zones:** player deployment, enemy deployment, ingress and objective, painted as their own layer; they can overlap.
+- **Background art:** upload an image, set the hex size (centre to corner, in image px) and the image position of the top-left hex's centre, then "fit columns and rows". The image stays in the browser (IndexedDB) and moves to Supabase Storage in Milestone 2. It's never committed to the repo.
+- **Display:** solid blocks, see-through blocks over art, or flat with height numbers.
+
 ## Movement (assist)
 
 - Click your unit to show reachable hexes up to its Speed, with difficult terrain costing double and blocking terrain impassable.
 - Boost shows a second, lighter ring.
 - Moving out of engagement and into new engagement is flagged, not blocked.
-- Obstruction is by Size (core p62): hostiles and hard cover (treated as Size 1) block units their Size or smaller; bigger units pass through but can't stop there. Becoming engaged by an equal or larger hostile ends the move.
+- Obstruction is by Size (core p62): hostiles your Size or larger block you; smaller ones can be passed through but not stopped on. Becoming engaged by an equal or larger hostile ends the move.
+- Height is a surface units stand on. Stepping down is free; stepping onto anything smaller than the unit is a normal step; taller terrain is climbed at +2 per level (core p63); ramps go up one level at no extra cost. Hexes 3+ levels below the start are marked as drops (fall damage if the unit just steps off).
+- Adjacency and engagement include vertical distance: a mech on a Height 6 roof isn't engaged by one on the street below.
 - The GM can drag anything anywhere.
 
 ## Auth and identity
@@ -133,6 +145,7 @@ COMP/CON has no public link to a pilot, so the site keeps its own copies:
 ## Milestones
 
 1. **Board, local only.** ✅ Done: isometric map, terrain painting, unit placement by frame, move range with Boost, engagement flags, rotation, undo. Saved in the browser.
+1.5. **Real maps.** ✅ Done: rectangular maps in pointy- or flat-top layouts, terrain height, ground tags (difficult, dangerous, soft cover, ramp, impassable), zones (deployment, ingress, objective), background art with grid calibration, solid / see-through / flat terrain display, 30° view rotation.
 2. **Shared table.** Supabase project, Discord login, campaigns, the events table, realtime sync, turn tracker, players moving their own units, GM proxy.
 3. **Tracking.** HP, heat, structure, stress, statuses, combat log, GM undo.
 4. **Async.** Discord turn notifications, turn timer.

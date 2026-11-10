@@ -1,11 +1,13 @@
 import { footprint, key, neighbors, type Hex } from './hex'
-import type { BoardState, Unit } from './state'
+import { hasTag, levelAt, type BoardState, type Unit } from './state'
 
 export interface Reach {
   /** Movement cost to reach each anchor hex. */
   cost: Map<string, number>
   /** Anchor hexes where the unit would end up engaged (adjacent to a hostile). */
   engaged: Set<string>
+  /** Anchor hexes 3 or more levels below where the unit started: a fall if it just steps off. */
+  drops: Set<string>
 }
 
 /** Every hex covered by a unit's footprint, keyed to the unit's id. */
@@ -17,6 +19,9 @@ export function occupancy(state: BoardState): Map<string, string> {
 
 const hostile = (a: Unit, b: Unit) => a.side !== b.side
 
+/** Anything under SIZE 1 rounds up when measuring (core p59). */
+const height = (size: number) => Math.max(1, size)
+
 /** Hexes adjacent to a unit's footprint. */
 function ring(u: Unit): Set<string> {
   const zone = new Set<string>()
@@ -24,57 +29,68 @@ function ring(u: Unit): Set<string> {
   return zone
 }
 
-/** Hexes adjacent to any hostile unit's footprint. */
-function threatZone(state: BoardState, mover: Unit): Set<string> {
-  const zone = new Set<string>()
-  for (const u of state.units) {
-    if (u.id === mover.id || !hostile(mover, u)) continue
-    for (const k of ring(u)) zone.add(k)
-  }
-  return zone
+interface Threat {
+  unit: Unit
+  ring: Set<string>
+  level: number
 }
 
 /**
- * Hard cover is treated as a Size 1 solid object (a wall, a wreck, a building corner).
- * Core rules: characters are obstructed by solid objects and characters the same SIZE or larger,
- * can pass through smaller ones, and can never end a move in an occupied space.
+ * Adjacency is within one space in any direction, vertical included (core p62).
+ * Two units on neighbouring hexes are adjacent if their vertical extents touch or overlap.
  */
-export const HARD_COVER_SIZE = 1
+function touches(t: Threat, fp: string[], level: number, size: number): boolean {
+  if (!fp.some((k) => t.ring.has(k))) return false
+  const top = Math.min(level + height(size), t.level + height(t.unit.size))
+  return Math.max(level, t.level) <= top
+}
+
+function threats(state: BoardState, mover: Unit): Threat[] {
+  return state.units
+    .filter((u) => u.id !== mover.id && hostile(mover, u))
+    .map((u) => ({ unit: u, ring: ring(u), level: levelAt(state, u, u.size) }))
+}
+
+/** How many levels you can step up without climbing. Smaller objects are stepped over. */
+const stepUp = (size: number) => (size >= 2 ? size - 1 : 0)
 
 /**
  * Where a unit can move with `budget` spaces (assist mode: nothing here blocks the GM).
+ *
  * Core rules, Section 3 (Movement):
- * - Difficult terrain costs 2 per space entered. Blocking terrain and off-map hexes are impassable.
- * - Obstruction is by SIZE: hostiles and hard cover the same SIZE or larger block; smaller ones
- *   can be passed through. Allies never obstruct. Nobody can end a move in an occupied space.
+ * - Difficult terrain costs 2 per space entered. Impassable hexes and off-map hexes can't be entered.
+ * - Hostiles the same SIZE or larger obstruct; smaller ones can be passed through. Allies never
+ *   obstruct. Nobody can end a move in a space another character occupies.
  * - Becoming ENGAGED by a hostile of equal or greater SIZE ends the move immediately.
  *   Hostiles the unit was already engaged with at the start don't stop it.
+ *
+ * Height (our reading, GM can override with a free move):
+ * - Terrain height is a surface: units stand on top of whatever is under them.
+ * - Stepping down is free. Stepping up onto anything smaller than the unit is a normal step.
+ * - Anything taller is climbed at half speed: +2 per level climbed (core p63, Climbing).
+ * - Ramps: up one level at no extra cost.
  */
-export function reachable(state: BoardState, unitId: string, budget: number): Reach {
+export function reachable(state: BoardState, map: Set<string>, unitId: string, budget: number): Reach {
   const unit = state.units.find((u) => u.id === unitId)
   const cost = new Map<string, number>()
   const engaged = new Set<string>()
-  if (!unit) return { cost, engaged }
+  const drops = new Set<string>()
+  if (!unit) return { cost, engaged, drops }
 
   const occ = occupancy(state)
   const byId = new Map(state.units.map((u) => [u.id, u]))
-  const zone = threatZone(state, unit)
+  const all = threats(state, unit)
 
-  const startHexes = footprint(unit, unit.size).map(key)
-  const hostiles = state.units.filter((u) => u.id !== unit.id && hostile(unit, u))
+  const startLevel = levelAt(state, unit, unit.size)
+  const startFp = footprint(unit, unit.size).map(key)
   // Hostiles big enough to stop this unit by engaging it, minus any it's already engaged with.
-  const stoppers = hostiles
-    .filter((h) => h.size >= unit.size)
-    .map((h) => ring(h))
-    .filter((zoneOf) => !startHexes.some((k) => zoneOf.has(k)))
+  const stoppers = all.filter((t) => t.unit.size >= unit.size && !touches(t, startFp, startLevel, unit.size))
+
+  const fpKeys = (anchor: Hex) => footprint(anchor, unit.size).map(key)
 
   const passable = (anchor: Hex): boolean =>
-    footprint(anchor, unit.size).every((h) => {
-      const k = key(h)
-      if (!state.map.has(k)) return false
-      const t = state.terrain.get(k)
-      if (t === 'blocking') return false
-      if (t === 'cover_hard' && HARD_COVER_SIZE >= unit.size) return false
+    fpKeys(anchor).every((k) => {
+      if (!map.has(k) || hasTag(state, k, 'impassable')) return false
       const who = occ.get(k)
       if (!who || who === unit.id) return true
       const other = byId.get(who)!
@@ -82,20 +98,28 @@ export function reachable(state: BoardState, unitId: string, budget: number): Re
     })
 
   const canStop = (anchor: Hex): boolean =>
-    footprint(anchor, unit.size).every((h) => {
-      const k = key(h)
+    fpKeys(anchor).every((k) => {
       const who = occ.get(k)
-      return (!who || who === unit.id) && state.terrain.get(k) !== 'cover_hard'
+      return !who || who === unit.id
     })
 
-  /** Would arriving here newly engage a hostile of equal or greater SIZE? Then the move ends here. */
   const stopsHere = (anchor: Hex): boolean => {
-    const fp = footprint(anchor, unit.size).map(key)
-    return stoppers.some((zoneOf) => fp.some((k) => zoneOf.has(k)))
+    const fp = fpKeys(anchor)
+    const level = levelAt(state, anchor, unit.size)
+    return stoppers.some((t) => touches(t, fp, level, unit.size))
   }
 
-  const stepCost = (anchor: Hex): number =>
-    footprint(anchor, unit.size).some((h) => state.terrain.get(key(h)) === 'difficult') ? 2 : 1
+  const stepCost = (from: Hex, to: Hex): number => {
+    const fromLevel = levelAt(state, from, unit.size)
+    const toLevel = levelAt(state, to, unit.size)
+    const toFp = fpKeys(to)
+    const base = toFp.some((k) => hasTag(state, k, 'difficult')) ? 2 : 1
+    const rise = toLevel - fromLevel
+    if (rise <= stepUp(unit.size)) return base
+    const ramp = [...toFp, ...fpKeys(from)].some((k) => hasTag(state, k, 'ramp'))
+    if (ramp && rise <= 1) return base
+    return base + 2 * rise
+  }
 
   // Dijkstra over anchor positions; costs are small integers so a sorted frontier is fine.
   const best = new Map<string, number>([[key(unit), 0]])
@@ -107,7 +131,7 @@ export function reachable(state: BoardState, unitId: string, budget: number): Re
     if (spent > 0 && stopsHere(at)) continue // engagement ends the move here
     for (const n of neighbors(at)) {
       if (!passable(n)) continue
-      const c = spent + stepCost(n)
+      const c = spent + stepCost(at, n)
       if (c > budget || c >= (best.get(key(n)) ?? Infinity)) continue
       best.set(key(n), c)
       frontier.push([n, c])
@@ -120,15 +144,19 @@ export function reachable(state: BoardState, unitId: string, budget: number): Re
     const anchor = { q, r }
     if (!canStop(anchor)) continue
     cost.set(k, c)
-    if (footprint(anchor, unit.size).some((h) => zone.has(key(h)))) engaged.add(k)
+    const fp = fpKeys(anchor)
+    const level = levelAt(state, anchor, unit.size)
+    if (all.some((t) => touches(t, fp, level, unit.size))) engaged.add(k)
+    if (startLevel - level >= 3) drops.add(k)
   }
-  return { cost, engaged }
+  return { cost, engaged, drops }
 }
 
 /** Is this unit currently adjacent to a hostile? */
 export function isEngaged(state: BoardState, unitId: string): boolean {
   const unit = state.units.find((u) => u.id === unitId)
   if (!unit) return false
-  const zone = threatZone(state, unit)
-  return footprint(unit, unit.size).some((h) => zone.has(key(h)))
+  const fp = footprint(unit, unit.size).map(key)
+  const level = levelAt(state, unit, unit.size)
+  return threats(state, unit).some((t) => touches(t, fp, level, unit.size))
 }

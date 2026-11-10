@@ -1,26 +1,33 @@
-import { useMemo, useRef, useState, type MouseEvent, type PointerEvent, type WheelEvent } from 'react'
-import { corners, footprint, fromKey, HEX_SIZE, ISO, key, points, toScreen, type Hex } from './hex'
+import { memo, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent, type WheelEvent } from 'react'
+import { DIRECTIONS, edgeCorners, footprint, fromKey, HEX_SIZE, key, points, add, type Hex } from './hex'
 import type { Reach } from './movement'
-import type { BoardState, Terrain, Unit } from './state'
+import { centerOf, ISO, LIFT_PER_LEVEL, makeProjection, type Projection } from './projection'
+import { levelAt, ZONE_STYLE, ZONES, type BoardState, type Cell, type MapConfig, type Unit, type ZoneKind } from './state'
 
 export interface BoardProps {
   state: BoardState
+  map: MapConfig
+  hexes: Hex[]
+  mapSet: Set<string>
+  /** View rotation in 30° steps. */
   rotation: number
   selectedId: string | null
   reach: Reach | null
-  /** Units with a cost above this are in Boost range (drawn lighter). */
+  /** Hexes with a cost above this are in Boost range (drawn lighter). */
   normalRange: number
   /** True while a drag should paint rather than pan. */
   painting: boolean
+  /** Highlight the grid for lining it up with background art. */
+  calibrating: boolean
+  backgroundUrl: string | null
   /** A hex was clicked (or pressed, while painting). `shift` is the GM free-move modifier. */
   onHexDown: (h: Hex, shift: boolean) => void
   onHexEnter: (h: Hex, dragging: boolean) => void
   onUnitClick: (id: string) => void
 }
 
-const LIFT: Record<Terrain, number> = { blocking: 30, cover_hard: 14, cover_soft: 10, difficult: 0 }
-
 const SIDE_COLOR = { pc: '#4fb3d9', npc: '#e5534b' }
+
 
 interface View {
   x: number
@@ -28,36 +35,62 @@ interface View {
   zoom: number
 }
 
+const lift = (h: number) => h * LIFT_PER_LEVEL
+
 export default function Board(props: BoardProps) {
-  const { state, rotation, selectedId, reach, normalRange, painting } = props
+  const { state, map, hexes, mapSet, rotation, reach, normalRange, painting, calibrating, backgroundUrl } = props
   const [view, setView] = useState<View>({ x: 0, y: 0, zoom: 1 })
   const [hover, setHover] = useState<string | null>(null)
   const drag = useRef<{ x: number; y: number; vx: number; vy: number; moved: boolean; pan: boolean } | null>(null)
   const svgRef = useRef<SVGSVGElement>(null)
 
-  const hexes = useMemo(() => [...state.map].map(fromKey), [state.map])
+  const proj = useMemo(
+    () => makeProjection(map.orientation, rotation * 30, centerOf(hexes, map.orientation)),
+    [map.orientation, rotation, hexes],
+  )
+
+  // Fit the whole map in view.
+  const box = useMemo(() => {
+    let minX = Infinity
+    let minY = Infinity
+    let maxX = -Infinity
+    let maxY = -Infinity
+    for (const h of hexes)
+      for (const p of proj.hexCorners(h)) {
+        minX = Math.min(minX, p.x)
+        maxX = Math.max(maxX, p.x)
+        minY = Math.min(minY, p.y)
+        maxY = Math.max(maxY, p.y)
+      }
+    const pad = 70
+    if (!isFinite(minX)) return { x: -400, y: -300, w: 800, h: 600 }
+    return { x: minX - pad, y: minY - pad - 40, w: maxX - minX + pad * 2, h: maxY - minY + pad * 2 + 40 }
+  }, [hexes, proj])
+
+  const solid = map.terrainView !== 'flat'
 
   // Depth-sorted things that stand up off the ground: terrain blocks and units.
   const standing = useMemo(() => {
-    type Item = { y: number; kind: 'block'; hex: Hex; terrain: Terrain } | { y: number; kind: 'unit'; unit: Unit }
+    type Item = { y: number; kind: 'block'; hex: Hex; cell: Cell } | { y: number; kind: 'unit'; unit: Unit; level: number }
     const items: Item[] = []
-    for (const [k, t] of state.terrain) {
-      if (!LIFT[t]) continue
-      const hex = fromKey(k)
-      items.push({ y: toScreen(hex, rotation).y, kind: 'block', hex, terrain: t })
-    }
+    if (solid)
+      for (const [k, cell] of state.cells) {
+        if (cell.h <= 0 || !mapSet.has(k)) continue
+        const hex = fromKey(k)
+        items.push({ y: proj.hexCenter(hex).y, kind: 'block', hex, cell })
+      }
     for (const u of state.units) {
-      const ys = footprint(u, u.size).map((h) => toScreen(h, rotation).y)
-      items.push({ y: Math.max(...ys) + 0.1, kind: 'unit', unit: u })
+      const ys = footprint(u, u.size).map((h) => proj.hexCenter(h).y)
+      items.push({ y: Math.max(...ys) + 0.01, kind: 'unit', unit: u, level: solid ? levelAt(state, u, u.size) : 0 })
     }
     return items.sort((a, b) => a.y - b.y)
-  }, [state.terrain, state.units, rotation])
+  }, [state, mapSet, proj, solid])
 
-  // Convert a screen-pixel delta to viewBox units.
   const scale = () => {
     const svg = svgRef.current
     if (!svg) return 1
-    return 1120 / svg.getBoundingClientRect().width
+    const r = svg.getBoundingClientRect()
+    return Math.max(box.w / r.width, box.h / r.height)
   }
 
   const onPointerDown = (e: PointerEvent<SVGSVGElement>) => {
@@ -75,16 +108,15 @@ export default function Board(props: BoardProps) {
     setView((v) => ({ ...v, x: d.vx + dx * s, y: d.vy + dy * s }))
   }
   const onPointerUp = () => {
-    // Leave `moved` readable for the click that follows, then clear.
     setTimeout(() => (drag.current = null), 0)
   }
   const onWheel = (e: WheelEvent<SVGSVGElement>) => {
     const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1
-    setView((v) => ({ ...v, zoom: Math.min(3, Math.max(0.4, v.zoom * factor)) }))
+    setView((v) => ({ ...v, zoom: Math.min(5, Math.max(0.3, v.zoom * factor)) }))
   }
   const wasPan = () => drag.current?.moved && drag.current.pan
 
-  const hexHandlers = (h: Hex) => ({
+  const handlersFor = (h: Hex) => ({
     onPointerDown: (e: PointerEvent) => {
       if (painting && e.button === 0) props.onHexDown(h, e.shiftKey)
     },
@@ -96,12 +128,30 @@ export default function Board(props: BoardProps) {
       props.onHexEnter(h, painting && (e.buttons & 1) === 1)
     },
   })
+  // Keep a stable reference so memoised layers don't re-render on every hover.
+  const handlersRef = useRef(handlersFor)
+  useLayoutEffect(() => {
+    handlersRef.current = handlersFor
+  })
+  const stableHandlers = useMemo(
+    () => (h: Hex) => ({
+      onPointerDown: (e: PointerEvent) => handlersRef.current(h).onPointerDown(e),
+      onClick: (e: MouseEvent) => handlersRef.current(h).onClick(e),
+      onPointerEnter: (e: PointerEvent) => handlersRef.current(h).onPointerEnter(e),
+    }),
+    [],
+  )
+
+  const levelOf = (k: string) => (solid ? (state.cells.get(k)?.h ?? 0) : 0)
+  const bg = map.background
+  const cx = box.x + box.w / 2
+  const cy = box.y + box.h / 2
 
   return (
     <div className="board">
       <svg
         ref={svgRef}
-        viewBox="-560 -360 1120 720"
+        viewBox={`${box.x} ${box.y} ${box.w} ${box.h}`}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -109,131 +159,258 @@ export default function Board(props: BoardProps) {
         onWheel={onWheel}
         onContextMenu={(e) => e.preventDefault()}
       >
-        <defs>
-          <pattern id="difficult" width="10" height="6" patternUnits="userSpaceOnUse">
-            <rect width="10" height="6" fill="#2b2a24" />
-            <circle cx="3" cy="2" r="1.1" fill="#6b604a" />
-            <circle cx="8" cy="5" r="0.9" fill="#5a5140" />
-          </pattern>
-        </defs>
-        <g transform={`translate(${view.x} ${view.y}) scale(${view.zoom})`}>
-          {/* Ground */}
-          {hexes.map((h) => {
-            const k = key(h)
-            const t = state.terrain.get(k)
-            const cost = reach?.cost.get(k)
-            const fill = t === 'difficult' ? 'url(#difficult)' : t ? '#1d242c' : '#181e25'
-            return (
-              <g key={k} {...hexHandlers(h)} className="hex">
-                <polygon points={points(corners(h, rotation))} fill={fill} stroke="#2a323c" strokeWidth={1} />
-                {cost !== undefined && (
-                  <polygon
-                    points={points(corners(h, rotation, 0, 0.86))}
-                    className={cost > normalRange ? 'reach boost' : 'reach'}
-                  />
-                )}
-                {reach?.engaged.has(k) && (
-                  <polygon points={points(corners(h, rotation, 0, 0.7))} className="engage-mark" />
-                )}
-                {hover === k && <polygon points={points(corners(h, rotation))} className="hover" />}
-              </g>
-            )
-          })}
+        <Patterns />
+        <g transform={`translate(${view.x} ${view.y}) translate(${cx} ${cy}) scale(${view.zoom}) translate(${-cx} ${-cy})`}>
+          {bg && backgroundUrl && (
+            <g transform={proj.matrix}>
+              <image
+                href={backgroundUrl}
+                x={-bg.originX * (HEX_SIZE / bg.hexPx)}
+                y={-bg.originY * (HEX_SIZE / bg.hexPx)}
+                width={bg.width * (HEX_SIZE / bg.hexPx)}
+                height={bg.height * (HEX_SIZE / bg.hexPx)}
+                opacity={bg.opacity}
+                preserveAspectRatio="none"
+                style={{ pointerEvents: 'none' }}
+              />
+            </g>
+          )}
 
-          {/* Blocks and units, back to front */}
+          <Ground
+            hexes={hexes}
+            cells={state.cells}
+            proj={proj}
+            hasBackground={!!(bg && backgroundUrl)}
+            gridOpacity={calibrating ? 1 : map.gridOpacity}
+            calibrating={calibrating}
+            showHeights={!solid}
+            handlers={stableHandlers}
+          />
+          <Zones zones={state.zones} mapSet={mapSet} proj={proj} />
+
+          {/* Movement overlays on open ground (blocks draw their own on their tops) */}
+          {reach &&
+            [...reach.cost].map(([k, c]) =>
+              levelOf(k) > 0 ? null : (
+                <Overlay key={`r${k}`} k={k} proj={proj} boost={c > normalRange} engaged={reach.engaged.has(k)} drop={reach.drops.has(k)} />
+              ),
+            )}
+
           {standing.map((item) =>
             item.kind === 'block' ? (
               <Block
                 key={`b${key(item.hex)}`}
                 hex={item.hex}
-                terrain={item.terrain}
-                rotation={rotation}
-                handlers={hexHandlers(item.hex)}
+                cell={item.cell}
+                state={state}
+                proj={proj}
+                ghost={map.terrainView === 'ghost' || !!(bg && backgroundUrl && map.terrainView !== 'solid')}
+                handlers={stableHandlers(item.hex)}
                 reachCost={reach?.cost.get(key(item.hex))}
                 boost={(reach?.cost.get(key(item.hex)) ?? 0) > normalRange}
                 engaged={!!reach?.engaged.has(key(item.hex))}
-                hovered={hover === key(item.hex)}
+                drop={!!reach?.drops.has(key(item.hex))}
               />
             ) : (
               <Standee
                 key={item.unit.id}
                 unit={item.unit}
-                rotation={rotation}
-                selected={item.unit.id === selectedId}
+                proj={proj}
+                level={item.level}
+                selected={item.unit.id === props.selectedId}
                 onClick={() => !wasPan() && props.onUnitClick(item.unit.id)}
               />
             ),
           )}
+
+          {hover && mapSet.has(hover) && (
+            <polygon points={points(proj.hexCorners(fromKey(hover), lift(levelOf(hover))))} className="hover" />
+          )}
         </g>
       </svg>
       <div className="board-zoom">
-        <button onClick={() => setView((v) => ({ ...v, zoom: Math.min(3, v.zoom * 1.2) }))} aria-label="Zoom in">+</button>
-        <button onClick={() => setView((v) => ({ ...v, zoom: Math.max(0.4, v.zoom / 1.2) }))} aria-label="Zoom out">−</button>
-        <button onClick={() => setView({ x: 0, y: 0, zoom: 1 })} aria-label="Reset view">⌂</button>
+        <button onClick={() => setView((v) => ({ ...v, zoom: Math.min(5, v.zoom * 1.25) }))} aria-label="Zoom in">+</button>
+        <button onClick={() => setView((v) => ({ ...v, zoom: Math.max(0.3, v.zoom / 1.25) }))} aria-label="Zoom out">−</button>
+        <button onClick={() => setView({ x: 0, y: 0, zoom: 1 })} aria-label="Fit map">⌂</button>
       </div>
     </div>
   )
 }
 
-function Block({
-  hex,
-  terrain,
-  rotation,
-  handlers,
-  reachCost,
-  boost,
-  engaged,
-  hovered,
-}: {
-  hex: Hex
-  terrain: Terrain
-  rotation: number
-  handlers: object
-  reachCost?: number
-  boost: boolean
-  engaged: boolean
-  hovered: boolean
-}) {
-  const lift = LIFT[terrain]
-  const base = corners(hex, rotation, 0, 0.94)
-  const top = corners(hex, rotation, lift, 0.94)
-  const palette =
-    terrain === 'blocking'
-      ? { top: '#4a5563', side: '#323b46', side2: '#2a3139', opacity: 1 }
-      : terrain === 'cover_hard'
-        ? { top: '#5c5a4f', side: '#403e36', side2: '#36342d', opacity: 1 }
-        : { top: '#4f6b4a', side: '#3a5136', side2: '#33482f', opacity: 0.7 }
-  // Flat-top corners 0..5 run clockwise from the right; 0→1→2→3 are the front (bottom) edges.
-  const faces = [0, 1, 2].map((i) => [base[i], base[i + 1], top[i + 1], top[i]])
+function Patterns() {
   return (
-    <g {...handlers} opacity={palette.opacity} className="block">
-      {faces.map((f, i) => (
-        <polygon key={i} points={points(f)} fill={i === 1 ? palette.side : palette.side2} stroke="#1a1f25" strokeWidth={0.6} />
-      ))}
-      <polygon points={points(top)} fill={palette.top} stroke="#1a1f25" strokeWidth={0.6} />
-      {/* Overlays sit on the block's top face so they aren't hidden under it. */}
-      {reachCost !== undefined && (
-        <polygon points={points(corners(hex, rotation, lift, 0.8))} className={boost ? 'reach boost' : 'reach'} />
+    <defs>
+      <pattern id="t-difficult" width="10" height="6" patternUnits="userSpaceOnUse">
+        <circle cx="3" cy="2" r="1.2" fill="#c9b27c" opacity="0.7" />
+        <circle cx="8" cy="5" r="1" fill="#a8925e" opacity="0.7" />
+      </pattern>
+      <pattern id="t-dangerous" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <rect width="5" height="10" fill="#f08a24" opacity="0.55" />
+      </pattern>
+      <pattern id="t-ramp" width="12" height="8" patternUnits="userSpaceOnUse">
+        <path d="M1 7 L6 2 L11 7" fill="none" stroke="#c08cf0" strokeWidth="1.4" opacity="0.9" />
+      </pattern>
+    </defs>
+  )
+}
+
+interface GroundProps {
+  hexes: Hex[]
+  cells: Map<string, Cell>
+  proj: Projection
+  hasBackground: boolean
+  gridOpacity: number
+  calibrating: boolean
+  showHeights: boolean
+  handlers: (h: Hex) => object
+}
+
+const Ground = memo(function Ground({ hexes, cells, proj, hasBackground, gridOpacity, calibrating, showHeights, handlers }: GroundProps) {
+  return (
+    <g className="ground">
+      {hexes.map((h) => {
+        const k = key(h)
+        const cell = cells.get(k)
+        const pts = points(proj.hexCorners(h))
+        const tags = cell?.tags ?? []
+        return (
+          <g key={k} className="hex" {...handlers(h)}>
+            <polygon
+              points={pts}
+              fill={hasBackground ? 'rgba(0,0,0,0.001)' : '#181e25'}
+              stroke={calibrating ? '#4fe3ff' : '#55606c'}
+              strokeOpacity={gridOpacity}
+              strokeWidth={calibrating ? 1.2 : 0.8}
+            />
+            {tags.includes('impassable') && <polygon points={pts} fill="#05070a" opacity={0.75} />}
+            {tags.includes('soft_cover') && <polygon points={pts} fill="#3f8f4a" opacity={0.38} />}
+            {tags.includes('difficult') && <polygon points={pts} fill="url(#t-difficult)" />}
+            {tags.includes('dangerous') && <polygon points={pts} fill="url(#t-dangerous)" />}
+            {tags.includes('ramp') && <polygon points={pts} fill="url(#t-ramp)" />}
+            {showHeights && cell && cell.h > 0 && (
+              <text {...proj.hexCenter(h)} dy={4} textAnchor="middle" className="height-label">
+                {cell.h}
+              </text>
+            )}
+          </g>
+        )
+      })}
+    </g>
+  )
+})
+
+const Zones = memo(function Zones({ zones, mapSet, proj }: { zones: Record<ZoneKind, Set<string>>; mapSet: Set<string>; proj: Projection }) {
+  const edges = edgeCorners(proj.orientation)
+  return (
+    <g className="zones">
+      {ZONES.map((z) => {
+        const set = zones[z]
+        if (!set.size) return null
+        const color = ZONE_STYLE[z].color
+        const fills: string[] = []
+        const lines: string[] = []
+        for (const k of set) {
+          if (!mapSet.has(k)) continue
+          const h = fromKey(k)
+          const c = proj.hexCorners(h)
+          fills.push(points(c))
+          DIRECTIONS.forEach((d, i) => {
+            if (set.has(key(add(h, d)))) return
+            const [a, b] = edges[i]
+            lines.push(`M${c[a].x.toFixed(1)} ${c[a].y.toFixed(1)}L${c[b].x.toFixed(1)} ${c[b].y.toFixed(1)}`)
+          })
+        }
+        return (
+          <g key={z}>
+            {fills.map((p, i) => (
+              <polygon key={i} points={p} fill={color} opacity={0.14} />
+            ))}
+            <path d={lines.join('')} stroke={color} strokeWidth={2.2} fill="none" strokeLinecap="round" />
+          </g>
+        )
+      })}
+    </g>
+  )
+})
+
+function Overlay({ k, proj, boost, engaged, drop, liftPx = 0 }: { k: string; proj: Projection; boost: boolean; engaged: boolean; drop: boolean; liftPx?: number }) {
+  const h = fromKey(k)
+  return (
+    <g style={{ pointerEvents: 'none' }}>
+      <polygon points={points(proj.hexCorners(h, liftPx, 0.86))} className={boost ? 'reach boost' : 'reach'} />
+      {engaged && <polygon points={points(proj.hexCorners(h, liftPx, 0.68))} className="engage-mark" />}
+      {drop && (
+        <text {...proj.hexCenter(h, liftPx)} dy={4} textAnchor="middle" className="drop-mark">
+          ↓
+        </text>
       )}
-      {engaged && <polygon points={points(corners(hex, rotation, lift, 0.66))} className="engage-mark" />}
-      {hovered && <polygon points={points(top)} className="hover" />}
     </g>
   )
 }
 
-function Standee({
-  unit,
-  rotation,
-  selected,
-  onClick,
+function Block({
+  hex,
+  cell,
+  state,
+  proj,
+  ghost,
+  handlers,
+  reachCost,
+  boost,
+  engaged,
+  drop,
 }: {
-  unit: Unit
-  rotation: number
-  selected: boolean
-  onClick: () => void
+  hex: Hex
+  cell: Cell
+  state: BoardState
+  proj: Projection
+  ghost: boolean
+  handlers: object
+  reachCost?: number
+  boost: boolean
+  engaged: boolean
+  drop: boolean
 }) {
+  const top = lift(cell.h)
+  const topPts = proj.hexCorners(hex, top)
+  const center = proj.hexCenter(hex)
+  const edges = edgeCorners(proj.orientation)
+  const faces: { pts: string; shade: number }[] = []
+  DIRECTIONS.forEach((d, i) => {
+    const nh = state.cells.get(key(add(hex, d)))?.h ?? 0
+    if (nh >= cell.h) return // hidden behind a neighbour at least as tall
+    const [a, b] = edges[i]
+    const baseA = proj.hexCorners(hex, lift(nh))[a]
+    const baseB = proj.hexCorners(hex, lift(nh))[b]
+    const midY = (baseA.y + baseB.y) / 2 + lift(nh)
+    if (midY <= center.y + 0.01) return // faces away from the viewer
+    const dx = (baseA.x + baseB.x) / 2 - center.x
+    faces.push({ pts: points([baseA, baseB, topPts[b], topPts[a]]), shade: dx < 0 ? 0 : 1 })
+  })
+  const tall = cell.h >= 4
+  const palette = ghost
+    ? { top: 'rgba(120,135,150,0.28)', side: ['rgba(60,70,82,0.45)', 'rgba(45,52,62,0.45)'], stroke: '#9fb0c2' }
+    : tall
+      ? { top: '#525d6b', side: ['#3a434e', '#2e353e'], stroke: '#1a1f25' }
+      : { top: '#5e5c52', side: ['#45433a', '#393730'], stroke: '#1a1f25' }
+  return (
+    <g {...handlers} className="block">
+      {faces.map((f, i) => (
+        <polygon key={i} points={f.pts} fill={palette.side[f.shade]} stroke={palette.stroke} strokeWidth={0.5} />
+      ))}
+      <polygon points={points(topPts)} fill={palette.top} stroke={palette.stroke} strokeWidth={0.6} />
+      {cell.tags.includes('ramp') && <polygon points={points(topPts)} fill="url(#t-ramp)" />}
+      {cell.tags.includes('difficult') && <polygon points={points(topPts)} fill="url(#t-difficult)" />}
+      {cell.tags.includes('dangerous') && <polygon points={points(topPts)} fill="url(#t-dangerous)" />}
+      {reachCost !== undefined && <Overlay k={key(hex)} proj={proj} boost={boost} engaged={engaged} drop={drop} liftPx={top} />}
+    </g>
+  )
+}
+
+function Standee({ unit, proj, level, selected, onClick }: { unit: Unit; proj: Projection; level: number; selected: boolean; onClick: () => void }) {
   const fp = footprint(unit, unit.size)
-  const pts = fp.map((h) => toScreen(h, rotation))
+  const liftPx = lift(level)
+  const pts = fp.map((h) => proj.hexCenter(h, liftPx))
   const cx = pts.reduce((t, p) => t + p.x, 0) / pts.length
   const cy = pts.reduce((t, p) => t + p.y, 0) / pts.length
   const s = unit.size <= 0.5 ? 0.8 : unit.size <= 1 ? 1 : unit.size < 3 ? 1.45 : 1.9
@@ -243,7 +420,7 @@ function Standee({
   return (
     <g className={selected ? 'standee selected' : 'standee'} onClick={onClick}>
       {fp.map((hx) => (
-        <polygon key={key(hx)} points={points(corners(hx, rotation, 0, 0.9))} fill={color} opacity={0.18} />
+        <polygon key={key(hx)} points={points(proj.hexCorners(hx, liftPx, 0.9))} fill={color} opacity={0.22} />
       ))}
       <ellipse cx={cx} cy={cy} rx={HEX_SIZE * 0.62 * s} ry={HEX_SIZE * 0.62 * s * ISO} fill="#0b0e11" stroke={color} strokeWidth={2} />
       <rect x={cx - w / 2} y={cy - h} width={w} height={h} rx={3} fill="#12171c" stroke={color} strokeWidth={selected ? 3 : 1.5} />

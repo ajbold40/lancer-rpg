@@ -1,10 +1,12 @@
-// Axial hex coordinates (q, r), flat-top orientation.
+// Axial hex coordinates (q, r). Works for flat-top and pointy-top layouts.
 // Reference: redblobgames.com/grids/hexagons
 
 export interface Hex {
   q: number
   r: number
 }
+
+export type Orientation = 'flat' | 'pointy'
 
 export const key = (h: Hex) => `${h.q},${h.r}`
 
@@ -41,7 +43,27 @@ export function hexagon(radius: number): Hex[] {
   return out
 }
 
-/** Rotate around the origin by `steps` × 60° clockwise. */
+/**
+ * A rectangular map of `cols` × `rows` hexes with hex (0,0) at the top-left.
+ * Pointy-top: odd rows are shifted right by half a hex. Flat-top: odd columns are shifted down.
+ */
+export function rectangle(cols: number, rows: number, o: Orientation): Hex[] {
+  const out: Hex[] = []
+  if (o === 'pointy') {
+    for (let r = 0; r < rows; r++) {
+      const off = Math.floor(r / 2)
+      for (let q = -off; q < cols - off; q++) out.push({ q, r })
+    }
+  } else {
+    for (let q = 0; q < cols; q++) {
+      const off = Math.floor(q / 2)
+      for (let r = -off; r < rows - off; r++) out.push({ q, r })
+    }
+  }
+  return out
+}
+
+/** Rotate around the origin by `steps` × 60°. */
 export function rotate(h: Hex, steps: number): Hex {
   let q = h.q
   let r = h.r
@@ -65,35 +87,42 @@ export function footprint(anchor: Hex, size: number): Hex[] {
   return [anchor, ...neighbors(anchor)]
 }
 
-// ---- Screen projection -------------------------------------------------
+// ---- Plane geometry (before the isometric view is applied) -------------
 
-export const HEX_SIZE = 36 // centre to corner, in px before the iso squash
-export const ISO = 0.56 // vertical squash for the 2.5D look
+/** Centre-to-corner size of a hex on the board plane, in px. */
+export const HEX_SIZE = 36
 
-/** Flat-top hex centre on the unsquashed plane. */
-export function toPlane(h: Hex): { x: number; y: number } {
-  return {
-    x: HEX_SIZE * 1.5 * h.q,
-    y: HEX_SIZE * Math.sqrt(3) * (h.r + h.q / 2),
-  }
+export interface Point {
+  x: number
+  y: number
 }
 
-/** Screen position of a hex centre (squashed), after view rotation. */
-export function toScreen(h: Hex, rotation: number): { x: number; y: number } {
-  const p = toPlane(rotate(h, rotation))
-  return { x: p.x, y: p.y * ISO }
+/** Hex centre on the flat board plane. */
+export function toPlane(h: Hex, o: Orientation, size = HEX_SIZE): Point {
+  return o === 'flat'
+    ? { x: size * 1.5 * h.q, y: size * Math.sqrt(3) * (h.r + h.q / 2) }
+    : { x: size * Math.sqrt(3) * (h.q + h.r / 2), y: size * 1.5 * h.r }
 }
 
-/** Screen-space corners of a hex, optionally lifted by `lift` px. */
-export function corners(h: Hex, rotation: number, lift = 0, scale = 1): { x: number; y: number }[] {
-  const c = toScreen(h, rotation)
+/** Corner offsets from a hex centre, clockwise (screen y points down). */
+export function cornerOffsets(o: Orientation, size = HEX_SIZE): Point[] {
+  const start = o === 'flat' ? 0 : -30
   return Array.from({ length: 6 }, (_, i) => {
-    const a = (Math.PI / 3) * i
-    return {
-      x: c.x + HEX_SIZE * scale * Math.cos(a),
-      y: c.y + HEX_SIZE * scale * Math.sin(a) * ISO - lift,
-    }
+    const a = ((start + 60 * i) * Math.PI) / 180
+    return { x: size * Math.cos(a), y: size * Math.sin(a) }
   })
 }
 
-export const points = (ps: { x: number; y: number }[]) => ps.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
+/** For each of the six DIRECTIONS, the indices of the two corners on the shared edge. */
+export function edgeCorners(o: Orientation): [number, number][] {
+  const corners = cornerOffsets(o, 1)
+  return DIRECTIONS.map((d) => {
+    const n = toPlane(d, o, 1)
+    const ranked = corners
+      .map((c, i) => ({ i, dist: Math.hypot(c.x - n.x / 2, c.y - n.y / 2) }))
+      .sort((a, b) => a.dist - b.dist)
+    return [ranked[0].i, ranked[1].i]
+  })
+}
+
+export const points = (ps: Point[]) => ps.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')

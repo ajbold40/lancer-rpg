@@ -24,6 +24,7 @@ npm run dev
 3. Hex grid design doc: see [`docs/grid-design.md`](docs/grid-design.md) (draft)
 4. Hex grid MVP:
    - ~~Milestone 1: local isometric board~~ (terrain, units, move range, engagement, rotation, undo)
+   - ~~Milestone 1.5: real maps~~ (heights, zones, background art with grid calibration, pointy/flat hexes)
    - Milestone 2: Supabase, Discord login, realtime sync, turn tracker, GM proxy
    - Milestone 3: HP/heat/structure tracking, combat log
 5. COMP/CON pilot import and a pilot roster page

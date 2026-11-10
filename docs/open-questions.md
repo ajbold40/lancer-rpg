@@ -20,7 +20,9 @@ One list for everything waiting on someone. Tick items off as they're settled, a
 
 ## Design decisions
 
-- [ ] Do maps need a background image in v1, or is painted terrain enough?
+- [ ] **Climbing and falling details.** The board charges +2 per level climbed and flags drops of 3+. Jumping, climb checks (HULL/AGILITY) and actual fall damage are left to the table for now.
+
+- [x] Do maps need a background image in v1? Yes: published maps are art with a hex grid. Built in Milestone 1.5 with grid calibration.
 - [ ] How should cover and line of sight be shown before they're automated: GM-placed markers, or terrain only?
 - [ ] Which automation does the table want first? Poll after a session or two.
 
