@@ -20,7 +20,7 @@ npm run dev
 ## Roadmap
 
 1. ~~Repo scaffold~~
-2. ~~Frame questionnaire v1~~: 11 questions, 55 frames (core + 8 supplements), manufacturer "catch" blurbs. SSC, IPS-N and GMS blurbs still need checking against the books.
+2. ~~Frame questionnaire v1~~: 11 questions, 55 frames (core + 8 supplements), manufacturer "catch" blurbs (checked against the core book).
 3. Hex grid design doc: see [`docs/grid-design.md`](docs/grid-design.md) (draft)
 4. Hex grid MVP:
    - ~~Milestone 1: local isometric board~~ (terrain, units, move range, engagement, rotation, undo)
